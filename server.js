@@ -85,7 +85,7 @@ app.get('/:prefix/:model/:attribute/:token/:filename', function(req, res, next) 
   })
 })
 
-app.use('/', function(req, res) {
+app.use('/:prefix/:model/:attribute/:token', function(req, res) {
   if (res.image) {
     res.setHeader('Content-Type',   res.image.format);
     res.setHeader('Content-Length', res.image.length);
