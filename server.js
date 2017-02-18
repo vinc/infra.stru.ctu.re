@@ -119,13 +119,20 @@ const cacheFile = function(req, res, next) {
                 return console.error('Unable to read the given large object', err);
               }
 
-              const fileStream = fs.createWriteStream(req.image);
+              const cache = fs.createWriteStream(req.image);
 
-              stream.pipe(fileStream);
+              stream.pipe(cache);
 
+              // Wait until the stream from the database end to release the
+              // connection, then wait until the stream to the cache finish
+              // to move on to the next function. Otherwise the resizer will
+              // complain about the file :(
               stream.on('end', function() {
                 client.query('COMMIT', done);
-                next();
+
+                cache.on('finish', function() {
+                  next();
+                });
               });
             });
           });
