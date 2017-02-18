@@ -1,10 +1,13 @@
 const express = require('express');
+const mkdirp = require('mkdirp');
 const morgan = require('morgan');
 const sharp = require('sharp');
 const path = require('path');
 const url = require('url');
 const fs = require('fs');
 const pg = require('pg');
+
+const LargeObjectManager = require('pg-large-object').LargeObjectManager;
 
 if (typeof process.env.DATABASE_URL === 'undefined') {
   throw new ReferenceError('DATABASE_URL environment variable must be set');
@@ -39,28 +42,119 @@ const app = express();
 
 app.use(morgan('combined'))
 
-const root = process.env.PUBLIC_DIR || 'public';
+const cacheDir = process.env.CACHE_DIR || 'tmp';
+
 app.param('filename', function(req, res, next) {
   req.image = path.join(
-    root,
-    req.params.prefix,
+    cacheDir,
     req.params.model,
     req.params.attribute,
-    req.params.token,
-    req.params.filename
+    req.params.id,
+    req.params.filename + '.jpg'
   );
 
   next();
 });
 
-app.get('/:prefix/:model/:attribute/:token/:geometry/:filename', function(req, res, next) {
-  const dimensions = req.params.geometry.split('x');
+const oidQuery = function(params) {
+  switch (params.model + '_' + params.attribute) {
+  case 'picture_image':
+    return 'SELECT image AS oid FROM pictures WHERE token = $1 AND image = $2';
+  case 'user_avatar':
+    return 'SELECT avatar AS oid FROM users WHERE username = $1 AND avatar = $2';
+  }
+}
+
+const cacheFile = function(req, res, next) {
+  fs.stat(req.image, function(err, stats) {
+    if (stats) {
+      return next();
+    }
+
+    mkdirp(path.dirname(req.image), function(err) {
+      if (err) {
+        return console.error('error creating dir', err);
+      }
+
+      pool.connect(function(err, client, done) {
+        if (err) {
+          return console.error('error fetching client from pool', err);
+        }
+
+        const man = new LargeObjectManager(client);
+
+        client.query('BEGIN', function(err, result) {
+          if (err) {
+            done(err);
+            return client.emit('error', err);
+          }
+
+          const sql = oidQuery(req.params);
+
+          if (!sql) {
+            done();
+            console.error('Wrong parameters');
+            return next();
+          }
+
+          client.query(sql, [req.params.id, req.params.filename], function(err, result) {
+            if (err) {
+              done(err);
+              return client.emit('error', err);
+            }
+
+            if (result.rowCount == 0) {
+              done();
+              console.error('Wrong parameters');
+              return next();
+            }
+
+            const oid = result.rows[0].oid;
+
+            const bufferSize = 16384;
+
+            man.openAndReadableStream(oid, bufferSize, function(err, size, stream) {
+              if (err) {
+                done(err);
+                return console.error('Unable to read the given large object', err);
+              }
+
+              const fileStream = fs.createWriteStream(req.image);
+
+              stream.pipe(fileStream);
+
+              stream.on('end', function() {
+                client.query('COMMIT', done);
+                next();
+              });
+            });
+          });
+        });
+      });
+    });
+  });
+};
+
+app.get('/:model/:attribute/:id/:geometry/:filename.jpg', cacheFile, function(req, res, next) {
+  var geometry = req.params.geometry;
+  var crop = false;
+
+  if (geometry.slice(-1) == '!') {
+    geometry = geometry.slice(0, -1);
+    crop = true;
+  }
+
+  const dimensions = geometry.split('x');
   const width = Number(dimensions[0]) || null;
   const height = Number(dimensions[1]) || null;
 
-  sharp(req.image)
-    .resize(width, height)
-    .max() // TODO: remove if geometry ends with '!'
+  var resizer = sharp(req.image).resize(width, height);
+
+  if (!crop) {
+    resizer = resizer.max()
+  }
+
+  resizer
     .jpeg({ quality: 80 })
     .toBuffer(function(err, data, info) {
       if (err) {
@@ -74,7 +168,7 @@ app.get('/:prefix/:model/:attribute/:token/:geometry/:filename', function(req, r
     })
 });
 
-app.get('/:prefix/:model/:attribute/:token/:filename', function(req, res, next) {
+app.get('/:model/:attribute/:id/:filename.jpg', cacheFile, function(req, res, next) {
   fs.readFile(req.image, function(err, data) {
     if (err) {
       next(err);
@@ -87,14 +181,14 @@ app.get('/:prefix/:model/:attribute/:token/:filename', function(req, res, next) 
   })
 })
 
-app.use('/:prefix/:model/:attribute/:token', function(req, res, next) {
+app.use('/:model/:attribute/:id', function(req, res, next) {
   if (res.image) {
     res.setHeader('Content-Type',   res.image.format);
     res.setHeader('Content-Length', res.image.length);
     res.send(res.image);
 
     if (req.params.model == 'picture') {
-      chargeImage(req.params.token, res.image.length);
+      chargeImage(req.params.id, res.image.length);
     }
   } else {
     next();
