@@ -20,13 +20,24 @@ body {
   50%  { background-position: 100% 19% }
   100% { background-position:   0% 82% }
 }
+img {
+  max-height: 65vh;
+  max-width: 95vw;
+}
 h1 {
   font-family: monospace;
   font-size: 5vh;
   margin: 5vh 2.5vw 0;
-  text-align: center;
 }
-img {
-  max-height: 65vh;
-  max-width: 95vw;
+a {
+  color: #111;
+  text-align: center;
+  text-decoration: none;
+  transition: all 10s ease-out;
+  transition-delay: 0;
+}
+a:hover {
+  color: red;
+  text-shadow: 0px 0px 1vh red;
+  transition-delay: 10s;
 }
