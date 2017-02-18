@@ -64,6 +64,7 @@ app.get('/:prefix/:model/:attribute/:token/:geometry/:filename', function(req, r
     .jpeg({ quality: 80 })
     .toBuffer(function(err, data, info) {
       if (err) {
+        next(err);
         return console.error('error resizing image ' + req.image, err);
       }
 
@@ -76,6 +77,7 @@ app.get('/:prefix/:model/:attribute/:token/:geometry/:filename', function(req, r
 app.get('/:prefix/:model/:attribute/:token/:filename', function(req, res, next) {
   fs.readFile(req.image, function(err, data) {
     if (err) {
+      next(err);
       return console.error('error reading image ' + req.image, err);
     }
 
@@ -85,7 +87,7 @@ app.get('/:prefix/:model/:attribute/:token/:filename', function(req, res, next) 
   })
 })
 
-app.use('/:prefix/:model/:attribute/:token', function(req, res) {
+app.use('/:prefix/:model/:attribute/:token', function(req, res, next) {
   if (res.image) {
     res.setHeader('Content-Type',   res.image.format);
     res.setHeader('Content-Length', res.image.length);
@@ -94,7 +96,26 @@ app.use('/:prefix/:model/:attribute/:token', function(req, res) {
     if (req.params.model == 'picture') {
       chargeImage(req.params.token, res.image.length);
     }
+  } else {
+    next();
   }
+});
+
+app.use(express.static('public'));
+
+const errorPage = fs.readFileSync(path.join(__dirname, 'public/index.html'));
+
+app.use(function(req, res) {
+  res.writeHead(404, { 'Content-Type': 'text/html' });
+  res.write(errorPage);
+  res.end();
+});
+
+app.use(function(err, req, res, next) {
+  // FIXME: should be 500?
+  res.writeHead(404, { 'Content-Type': 'text/html' });
+  res.write(errorPage);
+  res.end();
 });
 
 app.listen(process.env.PORT || '3000', function() {
