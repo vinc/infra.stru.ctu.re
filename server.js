@@ -50,7 +50,7 @@ app.param('filename', function(req, res, next) {
     req.params.model,
     req.params.attribute,
     req.params.id,
-    req.params.filename + '.jpg'
+    req.params.filename
   );
 
   next();
@@ -59,9 +59,9 @@ app.param('filename', function(req, res, next) {
 const oidQuery = function(params) {
   switch (params.model + '_' + params.attribute) {
   case 'picture_image':
-    return 'SELECT image AS oid FROM pictures WHERE token = $1 AND image = $2';
+    return 'SELECT image AS oid FROM pictures WHERE token = $1 AND image_filename = $2';
   case 'user_avatar':
-    return 'SELECT avatar AS oid FROM users WHERE username = $1 AND avatar = $2';
+    return 'SELECT avatar AS oid FROM users WHERE username = $1 AND avatar_filename = $2';
   }
 }
 
@@ -142,7 +142,7 @@ const cacheFile = function(req, res, next) {
   });
 };
 
-app.get('/:model/:attribute/:id/:geometry/:filename.jpg', cacheFile, function(req, res, next) {
+app.get('/:model/:attribute/:id/:geometry/:filename', cacheFile, function(req, res, next) {
   var geometry = req.params.geometry;
   var crop = false;
 
@@ -176,7 +176,7 @@ app.get('/:model/:attribute/:id/:geometry/:filename.jpg', cacheFile, function(re
     })
 });
 
-app.get('/:model/:attribute/:id/:filename.jpg', cacheFile, function(req, res, next) {
+app.get('/:model/:attribute/:id/:filename', cacheFile, function(req, res, next) {
   fs.readFile(req.image, function(err, data) {
     if (err) {
       next(err);
