@@ -162,7 +162,8 @@ app.get('/:model/:attribute/:id/:geometry/:filename.jpg', cacheFile, function(re
   }
 
   resizer
-    .jpeg({ quality: 80 })
+    .sharpen()
+    .jpeg({ quality: 90 })
     .toBuffer(function(err, data, info) {
       if (err) {
         next(err);
