@@ -129,10 +129,7 @@ const cacheFile = function(req, res, next) {
               // complain about the file :(
               stream.on('end', function() {
                 client.query('COMMIT', done);
-
-                cache.on('finish', function() {
-                  next();
-                });
+                cache.on('finish', next);
               });
             });
           });
