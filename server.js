@@ -6,36 +6,26 @@ const sharp = require('sharp');
 const path = require('path');
 const url = require('url');
 const fs = require('fs');
-const pg = require('pg');
 
 const LargeObjectManager = require('pg-large-object').LargeObjectManager;
+const Promise = require('bluebird');
+const pgp = require('pg-promise')({ promiseLib: Promise });
+
+Promise.promisifyAll(LargeObjectManager.prototype, {multiArgs: true});
+
+const clientAdapter = t => ({
+  query: (obj, callback) => t.query(obj).then(rows => ({rows})).asCallback(callback)
+});
 
 if (typeof process.env.DATABASE_URL === 'undefined') {
   throw new ReferenceError('DATABASE_URL environment variable must be set');
 }
-const params = url.parse(process.env.DATABASE_URL);
-const auth = params.auth.split(':');
-const config = {
-  user: auth[0],
-  password: auth[1],
-  host: params.hostname,
-  port: params.port,
-  database: params.pathname.split('/')[1],
-};
-const pool = new pg.Pool(config);
-const query = 'UPDATE users SET balance = balance - $1 FROM pictures WHERE token = $2 AND users.id = pictures.user_id';
-const chargeImage = function(token, length) {
-  pool.connect(function(err, client, done) {
-    if (err) {
-      return console.error('error fetching client from pool', err);
-    }
-    client.query(query, [length, token], function(err, result) {
-      done(); // release the client back to the pool
+const db = pgp(process.env.DATABASE_URL);
 
-      if (err) {
-        return console.error('error running query', err);
-      }
-    });
+const chargeImage = function(token, length) {
+  const sql = 'UPDATE users SET balance = balance - $1 FROM pictures WHERE token = $2 AND users.id = pictures.user_id';
+  db.none(sql, [length, token]).catch(function(err) {
+    console.error('Error updating user balance', err);
   });
 };
 
@@ -67,86 +57,43 @@ const oidQuery = function(params) {
 }
 
 const cacheFile = function(req, res, next) {
-  fs.stat(req.image, function(err, stats) {
+  const dest = req.image;
+
+  fs.stat(dest, function(err, stats) {
     if (stats) {
       return next();
     }
 
-    mkdirp(path.dirname(req.image), function(err) {
+    mkdirp(path.dirname(dest), function(err) {
       if (err) {
-        console.error('error creating dir', err);
         return next(err);
       }
 
-      pool.connect(function(err, client, done) {
-        if (err) {
-          console.error('error fetching client from pool', err);
-          return next(err);
-        }
+      const sql = oidQuery(req.params);
 
-        const man = new LargeObjectManager(client);
+      db.one(sql, [req.params.id, req.params.filename]).then(function(data) {
+        const oid = data.oid;
 
-        client.query('BEGIN', function(err, result) {
-          if (err) {
-            done(err);
-            client.emit('error', err);
-            return next(err);
-          }
+        db.tx(function(t) {
+          const man = new LargeObjectManager(clientAdapter(t));
 
-          const sql = oidQuery(req.params);
+          return man.openAndReadableStreamAsync(oid).then(function([size, stream]) {
+            const rand = crypto.randomBytes(24).toString('hex');
+            const temp = fs.createWriteStream(dest + rand);
 
-          if (!sql) {
-            done();
-            console.error('Wrong parameters');
-            return next();
-          }
+            stream.pipe(temp);
 
-          client.query(sql, [req.params.id, req.params.filename], function(err, result) {
-            if (err) {
-              done(err);
-              client.emit('error', err);
-              return next(err);
-            }
-
-            if (result.rowCount == 0) {
-              done();
-              console.error('Wrong parameters');
-              return next();
-            }
-
-            const oid = result.rows[0].oid;
-
-            const bufferSize = 16384;
-
-            man.openAndReadableStream(oid, bufferSize, function(err, size, stream) {
-              if (err) {
-                done(err);
-                console.error('Unable to read the given large object', err);
-                return next(err);
-              }
-
-              // Stream to temporary file
-              const token = crypto.randomBytes(24).toString('hex');
-              const cache = fs.createWriteStream(req.image + token);
-
-              stream.pipe(cache);
-
+            return new Promise(function(resolve) {
               stream.on('end', function() {
-                client.query('COMMIT', done);
-
-                cache.on('finish', function() {
-                  // Rename temporary file to image filename
-                  fs.link(req.image + token, req.image, function(err) {
-                    // We ignore any errors meaning that the file has already
-                    // been streamed by another request since we started.
-                    next();
-                  });
+                fs.link(dest + rand, dest, function(err) {
+                  resolve();
                 });
               });
             });
           });
-        });
-      });
+        }).then(next).catch(next);
+
+      }).catch(next);
     });
   });
 };

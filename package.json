@@ -6,11 +6,13 @@
     "start": "node server.js"
   },
   "dependencies": {
+    "bluebird": "^3.4.7",
     "express": "~4.14.0",
     "mkdirp": "^0.5.1",
     "morgan": "~1.7.0",
     "pg": "^6.1.2",
     "pg-large-object": "^1.0.1",
+    "pg-promise": "^5.5.7",
     "sharp": "^0.17.2"
   }
 }
