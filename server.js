@@ -47,12 +47,12 @@ app.param('filename', function(req, res, next) {
   next();
 });
 
-const oidQuery = function(params) {
+const oidSQL = function(params) {
   switch (params.model + '_' + params.attribute) {
   case 'picture_image':
-    return 'SELECT image AS oid FROM pictures WHERE token = $1 AND image_filename = $2';
+    return 'SELECT image AS oid FROM pictures WHERE token = ${id} AND image_filename = ${filename}';
   case 'user_avatar':
-    return 'SELECT avatar AS oid FROM users WHERE username = $1 AND avatar_filename = $2';
+    return 'SELECT avatar AS oid FROM users WHERE username = ${filename} AND avatar_filename = ${filename}';
   }
 }
 
@@ -69,15 +69,10 @@ const cacheFile = function(req, res, next) {
         return next(err);
       }
 
-      const sql = oidQuery(req.params);
-
-      db.one(sql, [req.params.id, req.params.filename]).then(function(data) {
-        const oid = data.oid;
-
+      db.one(oidSQL(req.params), req.params).then(function(image) {
         db.tx(function(t) {
           const man = new LargeObjectManager(clientAdapter(t));
-
-          return man.openAndReadableStreamAsync(oid).then(function([size, stream]) {
+          return man.openAndReadableStreamAsync(image.oid).then(function([size, stream]) {
             const rand = crypto.randomBytes(24).toString('hex');
             const temp = fs.createWriteStream(dest + rand);
 
