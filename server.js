@@ -69,8 +69,8 @@ const cacheFile = function(req, res, next) {
         return next(err);
       }
 
-      db.one(oidSQL(req.params), req.params).then(function(image) {
-        db.tx(function(t) {
+      db.tx(function(t) {
+        return t.one(oidSQL(req.params), req.params).then(function(image) {
           const man = new LargeObjectManager(clientAdapter(t));
           return man.openAndReadableStreamAsync(image.oid).then(function([size, stream]) {
             const rand = crypto.randomBytes(24).toString('hex');
@@ -86,9 +86,8 @@ const cacheFile = function(req, res, next) {
               });
             });
           });
-        }).then(next).catch(next);
-
-      }).catch(next);
+        });
+      }).then(next).catch(next);
     });
   });
 };
