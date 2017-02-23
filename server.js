@@ -22,11 +22,32 @@ if (typeof process.env.DATABASE_URL === 'undefined') {
 }
 const db = pgp(process.env.DATABASE_URL);
 
+var charges = [];
+var lastChargedAt = +new Date();
+
 const chargeImage = function(token, length) {
-  const sql = 'UPDATE users SET balance = balance - $1 FROM pictures WHERE token = $2 AND users.id = pictures.user_id';
-  db.none(sql, [length, token]).catch(function(err) {
-    console.error('Error updating user balance', err);
-  });
+  charges.push([token, length]);
+
+  setTimeout(function() {
+    const now = +new Date();
+    if (now - lastChargedAt > 1000) {
+      lastChargedAt = now;
+
+      const n = charges.length;
+
+      // Sum lengths of identical tokens
+      const chargesAcc = charges.splice(0).reduce(function(acc, [k, v]) { acc[k] = (acc[k] || 0) + v; return acc }, { });
+
+      console.log('LOG Charging ' + n + ' request(s) for ' + Object.keys(chargesAcc).length + ' image(s)');
+
+      const sql = 'UPDATE users SET balance = balance - $2 FROM pictures WHERE token = $1 AND users.id = pictures.user_id';
+      const query = pgp.helpers.concat(Object.entries(chargesAcc).map(charge => ({ query: sql, values: charge })));
+
+      db.none(query).catch(function(err) {
+        console.error('Error updating user balance', err);
+      });
+    }
+  }, 1000);
 };
 
 const cacheDir = process.env.CACHE_DIR || 'tmp';
