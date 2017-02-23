@@ -13,10 +13,6 @@ const pgp = require('pg-promise')({ promiseLib: Promise });
 
 Promise.promisifyAll(LargeObjectManager.prototype, {multiArgs: true});
 
-const clientAdapter = t => ({
-  query: (obj, callback) => t.query(obj).then(rows => ({rows})).asCallback(callback)
-});
-
 if (typeof process.env.DATABASE_URL === 'undefined') {
   throw new ReferenceError('DATABASE_URL environment variable must be set');
 }
@@ -85,27 +81,36 @@ const cacheFile = function(req, res, next) {
 };
 
 const streamFile = function(req, res, next) {
-  db.tx(function(t) {
-    return t.one(oidSQL(req.params), req.params).then(function(image) {
-      const man = new LargeObjectManager(clientAdapter(t));
-      return man.openAndReadableStreamAsync(image.oid).then(function([size, stream]) {
-        const temp = fs.createWriteStream(req.tempCache);
+  var connection;
 
-        stream.pipe(temp);
+  db.connect().then(cn => {
+    connection = cn;
+    return cn.tx(t => {
+      return t.one(oidSQL(req.params), req.params).then(function(image) {
+        const man = new LargeObjectManager(cn.client);
+        return man.openAndReadableStreamAsync(image.oid).then(function([size, stream]) {
+          const temp = fs.createWriteStream(req.tempCache);
 
-        return new Promise(function(resolve) {
-          stream.on('end', function() {
-            fs.rename(req.tempCache, req.originalCache, function(err) {
-              if (err) {
-                return next(err);
-              }
-              resolve();
+          stream.pipe(temp);
+
+          return new Promise(function(resolve) {
+            stream.on('end', function() {
+              fs.rename(req.tempCache, req.originalCache, function(err) {
+                if (err) {
+                  return next(err);
+                }
+                resolve();
+              });
             });
           });
         });
       });
+    }).then(next).catch(next).finally(function() {
+      if (connection) {
+        connection.done();
+      }
     });
-  }).then(next).catch(next);
+  });
 };
 
 const resizeFile = function(req, res, next) {
