@@ -11,12 +11,9 @@ const LargeObjectManager = require('pg-large-object').LargeObjectManager;
 const Promise = require('bluebird');
 const pgp = require('pg-promise')({ promiseLib: Promise });
 
-Promise.promisifyAll(LargeObjectManager.prototype, {multiArgs: true});
+Promise.promisifyAll(LargeObjectManager.prototype, { multiArgs: true });
 
-if (typeof process.env.DATABASE_URL === 'undefined') {
-  throw new ReferenceError('DATABASE_URL environment variable must be set');
-}
-const db = pgp(process.env.DATABASE_URL);
+const db = pgp(process.env.DATABASE_URL || 'postgresql://localhost:5432/picture_development');
 
 var charges = [];
 var lastChargedAt = +new Date();
@@ -184,4 +181,4 @@ app.use(function(err, req, res, next) {
   res.end();
 });
 
-app.listen(process.env.PORT || '3000');
+app.listen(process.env.PORT || '4000');
