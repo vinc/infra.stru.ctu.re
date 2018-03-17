@@ -5,8 +5,8 @@
   "scripts": {
     "start": "node server.js"
   },
-  "engines" : {
-    "node" : "9.3.0"
+  "engines": {
+    "node": "9.3.0"
   },
   "dependencies": {
     "bluebird": "^3.4.7",
