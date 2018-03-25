@@ -8,12 +8,8 @@ const url = require('url');
 const fs = require('fs');
 
 const LargeObjectManager = require('pg-large-object').LargeObjectManager;
-const Promise = require('bluebird');
-const pgp = require('pg-promise')({ promiseLib: Promise });
-
-Promise.promisifyAll(LargeObjectManager.prototype, { multiArgs: true });
-
-const db = pgp(process.env.DATABASE_URL || 'postgresql://localhost:5432/picture_development');
+const pgp = require('pg-promise')();
+const db = pgp(process.env.DATABASE_URL || 'postgres://localhost:5432/picture_development');
 
 var charges = [];
 var lastChargedAt = +new Date();
@@ -29,12 +25,18 @@ const chargeImage = function(token, length) {
       const n = charges.length;
 
       // Sum lengths of identical tokens
-      const chargesAcc = charges.splice(0).reduce(function(acc, [k, v]) { acc[k] = (acc[k] || 0) + v; return acc }, { });
+      const chargesAcc = charges.splice(0).reduce(function(acc, [k, v]) {
+        acc[k] = (acc[k] || 0) + v;
+        return acc;
+      }, {});
 
       console.log('LOG Charging ' + n + ' request(s) for ' + Object.keys(chargesAcc).length + ' image(s)');
 
       const sql = 'UPDATE users SET balance = balance - $2 FROM pictures WHERE token = $1 AND users.id = pictures.user_id';
-      const query = pgp.helpers.concat(Object.entries(chargesAcc).map(charge => ({ query: sql, values: charge })));
+      const query = pgp.helpers.concat(Object.entries(chargesAcc).map(charge => ({
+        query: sql,
+        values: charge
+      })));
 
       db.none(query).catch(function(err) {
         console.error('Error updating user balance', err);
@@ -78,36 +80,29 @@ const cacheFile = function(req, res, next) {
 };
 
 const streamFile = function(req, res, next) {
-  var connection;
+  db.tx(tx => {
+    return tx.one(oidSQL(req.params), req.params).then(function(image) {
+      const man = new LargeObjectManager({ pgPromise: tx });
+      const bufferSize = 16384;
 
-  db.connect().then(cn => {
-    connection = cn;
-    return cn.tx(t => {
-      return t.one(oidSQL(req.params), req.params).then(function(image) {
-        const man = new LargeObjectManager(cn.client);
-        return man.openAndReadableStreamAsync(image.oid).then(function([size, stream]) {
-          const temp = fs.createWriteStream(req.tempCache);
+      return man.openAndReadableStreamAsync(image.oid, bufferSize).then(function([size, stream]) {
+        const temp = fs.createWriteStream(req.tempCache);
 
-          stream.pipe(temp);
+        stream.pipe(temp);
 
-          return new Promise(function(resolve) {
-            stream.on('end', function() {
-              fs.rename(req.tempCache, req.originalCache, function(err) {
-                if (err) {
-                  return next(err);
-                }
-                resolve();
-              });
+        return new Promise(function(resolve) {
+          stream.on('end', function() {
+            fs.rename(req.tempCache, req.originalCache, function(err) {
+              if (err) {
+                return next(err);
+              }
+              resolve();
             });
           });
         });
       });
-    }).then(next).catch(next).finally(function() {
-      if (connection) {
-        connection.done();
-      }
     });
-  });
+  }).then(next).catch(next);
 };
 
 const resizeFile = function(req, res, next) {
