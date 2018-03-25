@@ -46,17 +46,17 @@ const chargeImage = function(token, length) {
 const cacheDir = process.env.CACHE_DIR || 'tmp';
 
 const oidSQL = function(params) {
-  switch (params.model + '_' + params.attribute) {
-  case 'picture_image':
+  switch (params.model) {
+  case 'pictures':
     return 'SELECT image AS oid FROM pictures WHERE token = ${id} AND image_filename = ${filename}';
-  case 'user_avatar':
+  case 'users':
     return 'SELECT avatar AS oid FROM users WHERE username = ${id} AND avatar_filename = ${filename}';
   }
-}
+};
 
 const cacheFile = function(req, res, next) {
   req.cache = path.join(cacheDir, req.path);
-  req.originalCache = path.join(cacheDir, ...['model', 'attribute', 'id', 'filename'].map(k => req.params[k]))
+  req.originalCache = path.join(cacheDir, ...['model', 'id', 'filename'].map(k => req.params[k]));
   if (req.originalCache != req.cache) {
     req.resizedCache = req.cache;
   }
@@ -158,11 +158,17 @@ const serveFile = function(req, res, next) {
 const app = express();
 
 app.enable('trust proxy');
-app.use(morgan('dev'))
+app.use(morgan('dev'));
 
-app.get('/:model/:attribute/:id/:filename', cacheFile, streamFile, serveFile);
+// New routes:
+// v1: /picture/image/3cfbb86a/x300/7919403e579249e288fcfae3926e1e04.jpg
+// v2: /pictures/3cfbb86a/x300/7919403e579249e288fcfae3926e1e04.jpg
+app.get('/:model/:attribute(image|avatar)/*', function(req, res) {
+  res.redirect('/' + req.params.model + 's/' + req.params[0]);
+});
 
-app.get('/:model/:attribute/:id/:geometry/:filename', cacheFile, streamFile, resizeFile, serveFile);
+app.get('/:model/:id/:filename', cacheFile, streamFile, serveFile);
+app.get('/:model/:id/:geometry/:filename', cacheFile, streamFile, resizeFile, serveFile);
 
 app.use(express.static('public'));
 
