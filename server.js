@@ -1,3 +1,5 @@
+require('dotenv').config();
+
 const express = require('express');
 const crypto = require('crypto');
 const mkdirp = require('mkdirp');
@@ -9,7 +11,7 @@ const fs = require('fs');
 
 const LargeObjectManager = require('pg-large-object').LargeObjectManager;
 const pgp = require('pg-promise')();
-const db = pgp(process.env.DATABASE_URL || 'postgres://localhost:5432/picture_development');
+const db = pgp(process.env.DATABASE_URL);
 
 var charges = [];
 var lastChargedAt = +new Date();
@@ -45,7 +47,7 @@ const chargeImage = function(token, length) {
   }, 1000);
 };
 
-const cacheDir = process.env.CACHE_DIR || 'tmp';
+const cacheDir = process.env.CACHE_DIR;
 
 const oidSQL = function(params) {
   switch (params.model) {
@@ -182,4 +184,4 @@ app.use(function(err, req, res, next) {
   res.end();
 });
 
-app.listen(process.env.PORT || '4000');
+app.listen(process.env.PORT);

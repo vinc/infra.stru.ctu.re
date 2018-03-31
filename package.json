@@ -9,12 +9,13 @@
     "node": "9.3.0"
   },
   "dependencies": {
-    "express":         "~4.16.0",
-    "mkdirp":          "~0.5.1",
-    "morgan":          "~1.9.0",
-    "pg":              "~7.4.1",
+    "dotenv": "^5.0.1",
+    "express": "~4.16.0",
+    "mkdirp": "~0.5.1",
+    "morgan": "~1.9.0",
+    "pg": "~7.4.1",
     "pg-large-object": "~2.0.0",
-    "pg-promise":      "~8.2.2",
-    "sharp":           "~0.20.1"
+    "pg-promise": "~8.2.2",
+    "sharp": "~0.20.1"
   }
 }

@@ -1,9 +1,11 @@
-Picture Resizer
-===============
+Picture Infrastructure
+======================
 
-https://infra.stru.ctu.re
+Deliver images for https://pi.ctu.re
+Hosted at https://infra.stru.ctu.re
 
-Resize pictures of https://pi.ctu.re
+See the GitHub repository of [Picture](https://github.com/vinc/pi.ctu.re) for
+more information.
 
 License
 -------
