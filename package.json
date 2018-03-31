@@ -6,7 +6,7 @@
     "start": "node server.js"
   },
   "engines": {
-    "node": "9.3.0"
+    "node": "9.10.0"
   },
   "dependencies": {
     "dotenv": "^5.0.1",
