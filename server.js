@@ -143,7 +143,7 @@ const serveFile = function(req, res, next) {
     if (err) {
       return next(err);
     }
-    if (req.params.model == 'picture') {
+    if (req.params.model == 'pictures') {
       chargeImage(req.params.id, data.length);
     }
     res.setHeader('Content-Type',   'image/jpeg');
