@@ -120,7 +120,7 @@ const resizeFile = function(req, res, next) {
   const width = Number(dimensions[0]) || null;
   const height = Number(dimensions[1]) || null;
 
-  var resizer = sharp(req.originalCache).resize(width, height);
+  var resizer = sharp(req.originalCache).resize(width, height).withoutEnlargement();
 
   if (!crop) {
     resizer = resizer.max();
