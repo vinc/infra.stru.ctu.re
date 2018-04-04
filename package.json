@@ -6,11 +6,12 @@
     "start": "node server.js"
   },
   "engines": {
-    "node": "9.10.0"
+    "node": "9.10.1"
   },
   "dependencies": {
     "dotenv": "^5.0.1",
     "express": "~4.16.0",
+    "find-remove": "^1.2.0",
     "mkdirp": "~0.5.1",
     "morgan": "~1.9.0",
     "pg": "~7.4.1",

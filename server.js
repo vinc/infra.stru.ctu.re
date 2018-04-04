@@ -9,6 +9,8 @@ const path = require('path');
 const url = require('url');
 const fs = require('fs');
 
+const findRemoveSync = require('find-remove');
+
 const LargeObjectManager = require('pg-large-object').LargeObjectManager;
 const pgp = require('pg-promise')();
 const db = pgp(process.env.DATABASE_URL);
@@ -47,8 +49,6 @@ const chargeImage = function(token, length) {
   }, 1000);
 };
 
-const cacheDir = process.env.CACHE_DIR;
-
 const oidSQL = function(params) {
   switch (params.model) {
   case 'pictures':
@@ -58,6 +58,22 @@ const oidSQL = function(params) {
   }
 };
 
+const cacheDir = process.env.CACHE_DIR || 'tmp';
+const cacheTime = process.env.CACHE_TIME || '86400';
+
+// Remove old images from cache
+setInterval(function() {
+  const removed = findRemoveSync(cacheDir, {
+    age: { seconds: cacheTime },
+    extensions: '.jpg'
+  });
+  const n = Object.keys(removed).length;
+  if (n > 0) {
+    console.log('LOG Removed ' + n + ' image(s) older than ' + cacheTime + ' seconds');
+  }
+}, cacheTime * 1000);
+
+// Get image from cache
 const cacheFile = function(req, res, next) {
   req.cache = path.join(cacheDir, req.path);
   req.originalCache = path.join(cacheDir, ...['model', 'id', 'filename'].map(k => req.params[k]));
