@@ -1,12 +1,12 @@
 {
   "name": "infra_stru_ctu_re",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "private": true,
   "scripts": {
     "start": "node server.js"
   },
   "engines": {
-    "node": "9.10.1"
+    "node": "18.13.0"
   },
   "dependencies": {
     "dotenv": "^5.0.1",
