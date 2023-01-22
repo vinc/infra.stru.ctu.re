@@ -16,7 +16,7 @@
     "morgan": "~1.9.0",
     "pg": "~7.4.1",
     "pg-large-object": "~2.0.0",
-    "pg-promise": "~8.2.2",
-    "sharp": "~0.20.1"
+    "pg-promise": "~11.0.2",
+    "sharp": "~0.31.3"
   }
 }
