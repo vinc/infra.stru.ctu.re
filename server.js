@@ -136,13 +136,16 @@ const resizeFile = function(req, res, next) {
   const width = Number(dimensions[0]) || null;
   const height = Number(dimensions[1]) || null;
 
-  var resizer = sharp(req.originalCache).resize(width, height).withoutEnlargement();
+  var options = {
+    withoutEnlargement: true
+  };
 
   if (!crop) {
-    resizer = resizer.max();
+    options['fit'] = 'inside';
   }
 
-  resizer
+  sharp(req.originalCache)
+    .resize(width, height, options)
     .sharpen()
     .jpeg({ quality: 90 })
     .toFile(req.tempCache, function(err, info) {

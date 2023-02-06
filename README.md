@@ -10,4 +10,4 @@ more information.
 License
 -------
 
-Copyright (c) 2017-2018 Vincent Ollivier. Released under MIT.
+Copyright (c) 2017-2023 Vincent Ollivier. Released under MIT.
